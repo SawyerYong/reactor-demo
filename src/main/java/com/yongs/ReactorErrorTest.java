@@ -3,8 +3,10 @@ package com.yongs;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.SignalType;
 
 import java.util.Random;
+import java.util.concurrent.atomic.LongAdder;
 
 /**
  * @ClassName ReactorErrorTest
@@ -70,6 +72,59 @@ public class ReactorErrorTest {
                 .onErrorResume(e-> Mono.error(new Exception("出错",e)))
                 .subscribe(System.out::println,System.out::println);
 
+    }
+
+    /**
+     * 捕获，记录错误日志，然后继续抛出
+     */
+    @Test
+    public void test05(){
+        Flux.range(1, 6)
+                .map(i -> 10/(3-i))
+                .doOnError(e->{
+                    System.out.println("出错了, 出错信息: "+e.getMessage());
+                    e.printStackTrace();
+                })
+                .onErrorResume(e-> Mono.just(new Random().nextInt(6)))
+                .subscribe(System.out::println,System.out::println);
+    }
+
+
+
+    /**
+     * 捕获，记录错误日志，然后继续抛出  并使用 finally 来清理资源，
+     */
+    @Test
+    public void test06(){
+
+        Flux.range(1, 6)
+                .map(i -> 10/(3-i))
+                .doOnError(e->{
+                    System.out.println("出错了, 出错信息: "+e.getMessage());
+                    e.printStackTrace();
+                })
+                .doFinally(signalType -> {
+                    if(signalType== SignalType.CANCEL){
+                        // 触发取消事件
+                    }
+                    System.out.println("回收资源,signalType="+signalType);
+                })
+                .onErrorResume(e-> Mono.just(new Random().nextInt(6)))
+                .subscribe(System.out::println,System.out::println);
+    }
+
+
+    /**
+     * 出错重试, 即订阅者重庆重新获取一下资源流
+     */
+    @Test
+    public void test07(){
+        Flux.range(1, 6)
+                .map(i -> 10/(3-i))
+                .onErrorMap(e-> new Exception("出错",e))
+                // 错误后尝试两次
+                .retry(2)
+                .subscribe(System.out::println,System.out::println);
     }
 
 }
